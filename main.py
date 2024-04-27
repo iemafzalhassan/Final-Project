@@ -9,6 +9,11 @@ ROWS = 3
 COLS = 3
 
 
+jackpot = 0
+contribution_percentage = 0.01
+free_spins_multiplier = 2
+bonus_round_multiplier = 3
+
 symbol_count = {
     "1": 2,
     "2": 4,
@@ -77,6 +82,9 @@ def deposit():
             amount = int(amount)
             if amount > 0:
                 break
+            elif amount < 0:
+                print("Quitting the game...")
+                exit()
             else:
                 print("Invalid amount. Please enter a valid amount greater than 0.")
         else:
@@ -109,38 +117,69 @@ def get_bet():
             print(" Please enter a number.")
     return amount
 
-def spin (balance):
-    lines = get_number_of_lines()
-    while True:
-        bet = get_bet()
-        total_bet = bet * lines
+def spin(balance):
+    global jackpot
 
-        if total_bet > balance:
-            print(f"You do not have enough to bet that amount, Your current balance is :${balance}")
-        else:
-            break
+    lines = get_number_of_lines()
+    bet = get_bet()
+    total_bet = bet * lines
+
+    if random.random() < contribution_percentage:
+        jackpot += total_bet
 
     print(f"You are betting ${bet} on {lines}. Total bet is equal to: ${total_bet} ")
 
-
     slots = get_slot_machine_spin(ROWS, COLS, symbol_count)
     print_slot_machine(slots)
-    Winnings, winning_lines = check_winnings(slots, lines, bet, symbol_values)
-    print(f"You won ${Winnings}!")
+
+    winnings, winning_lines = check_winnings(slots, lines, bet, symbol_values)
+
+    # Check for free spins
+    if slots[0][0] == slots[1][0] == slots[2][0] == "1":
+        print("Congratulations, you've triggered free spins!")
+        free_spins_winnings = 0
+        for _ in range(5):
+            free_spins_slots = get_slot_machine_spin(ROWS, COLS, symbol_count)
+            free_spins_winnings += check_winnings(free_spins_slots, lines, bet, symbol_values)[0]
+        winnings += free_spins_winnings * free_spins_multiplier
+        print(f"You won ${free_spins_winnings * free_spins_multiplier} in free spins!")
+
+    # Check for bonus round
+    if slots[0][1] == slots[1][1] == slots[2][1] == "2":
+        print("Congratulations, you've triggered the bonus round!")
+        bonus_round_winnings = 0
+        for _ in range(3):
+            bonus_round_slots = get_slot_machine_spin(ROWS, COLS, symbol_count)
+            bonus_round_winnings += check_winnings(bonus_round_slots, lines, bet, symbol_values)[0]
+        winnings += bonus_round_winnings * bonus_round_multiplier
+        print(f"You won ${bonus_round_winnings * bonus_round_multiplier} in the bonus round!")
+
+    # Check for jackpot
+    if winning_lines == [3]:
+        winnings *= 10 # 10x multiplier for getting the rarest combination on the third payline
+        jackpot -= winnings # subtract the jackpot amount from the jackpot pool
+        print(f"Congratulations, you've won the jackpot! ${winnings}")
+
+    print(f"You won ${winnings}!")
     print(f"You won on lines:", * winning_lines)
-    return Winnings - total_bet
 
-
+    return winnings - total_bet
 
 
 def main():
     balance = deposit()
     while True:
+        if balance <= 0:
+            print("You have run out of balance. Please deposit more money to continue playing.")
+            balance = deposit()
+            continue
+
         print(f"Your current balance is: ${balance}")
         answer = input(" Press enter to play (q to quit).")
         if answer == "q":
             break
-        balance += spin(balance)
+        winnings = spin(balance)
+        balance += winnings
 
     print(f"You left with ${balance}. Thank you for playing!")
 
